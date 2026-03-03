@@ -1,0 +1,383 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[numbers]{natbib}
+\usepackage{mathtools}
+
+\title{Survival Analysis in Genomics: Models, Methods, Key Equations, and Future Directions \\ \vspace{1em} \large{Written Assignment submitted for Advanced Survival Class}}
+\author{Moran Guo}
+\date{March 1, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Genomics has transformed biomedical research by enabling high-dimensional molecular measurements (e.g., gene expression, somatic mutations, copy-number variation, methylation, proteomics) at cohort scale. Many impactful questions are time-to-event in nature, including overall survival, progression-free survival, time to recurrence, and time to treatment resistance. This review surveys survival analysis methods used in genomics, emphasizing (i) classical semiparametric modeling, (ii) high-dimensional regularization and dimension reduction, (iii) modern machine learning and deep learning, and (iv) practical evaluation issues. We highlight core mathematical formulations that recur throughout the literature and conclude with forward-looking research directions.
+\end{abstract}
+
+\section{Introduction}
+Time-to-event outcomes arise naturally in cancer and complex disease studies where individuals are followed longitudinally and events occur at heterogeneous times, often with right censoring. Genomics adds two defining characteristics: (1) \emph{high dimensionality} where the number of molecular features $p$ can far exceed sample size $n$, and (2) \emph{biological structure} (pathways, networks, correlated expression modules, multi-omics layers) that can be exploited for prediction and interpretation.
+The Cox proportional hazards (PH) model is foundational due to interpretability and semiparametric flexibility \citep{Cox1972}. However, genomic settings often require regularization, dimension reduction, and non-linear modeling.
+
+Large public resources such as The Cancer Genome Atlas (TCGA) catalyzed method development by providing multi-omics measurements linked to clinical outcomes \citep{Weinstein2013,Tomczak2015,Liu2018}. Early microarray studies demonstrated that gene expression signatures can stratify patients by recurrence and metastasis risk \citep{VantVeer2002,Paik2004}.
+
+\section{Notation and data structure (genomics survival)}
+For individual $i=1,\dots,n$, observe:
+\[
+T_i = \text{event time}, \quad C_i = \text{censoring time}, \quad
+\tilde T_i = \min(T_i, C_i), \quad \Delta_i = \mathbf{1}(T_i \le C_i),
+\]
+and high-dimensional genomic covariates $x_i \in \mathbb{R}^p$ (e.g., expression levels, mutation indicators, pathway scores).
+Define the counting-process style at-risk indicator and event indicator:
+\[
+Y_i(t) = \mathbf{1}(\tilde T_i \ge t), \qquad N_i(t) = \mathbf{1}(\tilde T_i \le t,\ \Delta_i=1).
+\]
+
+\section{Classical survival modeling foundations}
+\subsection{Cox proportional hazards model}
+The Cox PH model posits:
+\begin{equation}
+h(t \mid x) = h_0(t)\exp(x^\top \beta),
+\label{eq:cox_hazard}
+\end{equation}
+where $h_0(t)$ is the baseline hazard and $\beta \in \mathbb{R}^p$ are log hazard ratios.
+
+\subsubsection{Partial likelihood}
+Let $t_{(1)}<\cdots<t_{(D)}$ be distinct event times and $\mathcal{R}(t)$ the risk set just before time $t$.
+The Cox \emph{partial likelihood} is
+\begin{equation}
+L(\beta) = \prod_{d=1}^{D} \frac{\exp(x_{i_d}^\top \beta)}{\sum_{j\in \mathcal{R}(t_{(d)})}\exp(x_j^\top \beta)},
+\qquad
+\ell(\beta)=\log L(\beta),
+\label{eq:cox_partial_lik}
+\end{equation}
+where $i_d$ denotes the individual experiencing the event at $t_{(d)}$.
+The score (gradient) has the familiar ``observed minus expected'' structure:
+\begin{equation}
+U(\beta)=\frac{\partial \ell(\beta)}{\partial \beta}
+=
+\sum_{d=1}^{D}\left[
+x_{i_d}
+-
+\frac{\sum_{j\in \mathcal{R}(t_{(d)})}x_j\exp(x_j^\top \beta)}{\sum_{j\in \mathcal{R}(t_{(d)})}\exp(x_j^\top \beta)}
+\right].
+\label{eq:cox_score}
+\end{equation}
+
+\subsubsection{Baseline hazard estimation (Breslow)}
+After estimating $\hat\beta$, the cumulative baseline hazard is commonly estimated by the Breslow estimator:
+\begin{equation}
+\hat H_0(t)=\sum_{t_{(d)}\le t}\frac{1}{\sum_{j\in \mathcal{R}(t_{(d)})}\exp(x_j^\top \hat\beta)},
+\label{eq:breslow}
+\end{equation}
+yielding individual survival curves:
+\[
+\hat S(t\mid x)=\exp\!\left(-\hat H_0(t)\exp(x^\top \hat\beta)\right).
+\]
+
+\subsection{Why genomics stresses classical modeling}
+In genomics, $p$ is often $10^3$--$10^5$ while $n$ may be $10^2$--$10^3$, so unconstrained estimation of $\beta$ is ill-posed. This motivates feature screening, shrinkage/regularization, and dimension reduction.
+
+\section{High-dimensional regularization and feature selection}
+\subsection{Penalized Cox regression}
+The LASSO Cox model solves \citep{Tibshirani1997}:
+\begin{equation}
+\hat\beta(\lambda)
+=
+\arg\max_{\beta}\left\{\ell(\beta) - \lambda \|\beta\|_1\right\},
+\label{eq:lasso_cox}
+\end{equation}
+while elastic net uses a mixture of $\ell_1$ and $\ell_2$ penalties (often beneficial for correlated genes):
+\begin{equation}
+\hat\beta(\lambda,\alpha)
+=
+\arg\max_{\beta}\left\{\ell(\beta) - \lambda\left(\alpha\|\beta\|_1 + \tfrac{1-\alpha}{2}\|\beta\|_2^2\right)\right\},
+\qquad \alpha\in[0,1].
+\label{eq:enet_cox}
+\end{equation}
+Coordinate descent provides scalable regularization paths for Cox models \citep{Simon2011}.
+
+\subsection{Supervised principal components}
+Supervised principal components (SPC) first selects features associated with the outcome (e.g., via univariate Cox scores), then runs PCA on the selected matrix to obtain low-dimensional components $z_i\in\mathbb{R}^k$ and fits Cox on $z_i$ \citep{Bair2006}. A schematic is:
+\[
+x_i \in \mathbb{R}^p
+\;\xrightarrow[\text{screening}]{}
+\;x_i^{(\mathcal{S})} \in \mathbb{R}^{|\mathcal{S}|}
+\;\xrightarrow[\text{PCA}]{}
+\; z_i \in \mathbb{R}^k
+\;\xrightarrow[\text{Cox}]{}
+\;\hat h(t\mid z_i).
+\]
+
+\section{Machine learning methods for genomic survival}
+\subsection{Random survival forests}
+Random survival forests (RSF) build an ensemble of survival trees and average estimated cumulative hazards \citep{Ishwaran2008}. Conceptually, for a tree $b$ producing a terminal node $\nu_b(x)$ for covariates $x$, RSF estimates a node-specific cumulative hazard $\hat H_b(t\mid x)$ and averages:
+\begin{equation}
+\hat H_{\text{RSF}}(t\mid x) = \frac{1}{B}\sum_{b=1}^{B}\hat H_b(t\mid x),
+\qquad
+\hat S_{\text{RSF}}(t\mid x)=\exp\!\left(-\hat H_{\text{RSF}}(t\mid x)\right).
+\label{eq:rsf_chf}
+\end{equation}
+RSF can capture non-linearities and interactions (useful for multi-gene effects), but interpretability typically requires post-hoc tools.
+
+\subsection{Support vector survival methods}
+Support vector approaches often frame survival prediction as a ranking problem, aiming to order subjects by risk while handling censoring \citep{VanBelle2011}. These can be competitive in high-dimensional settings, though biological interpretability is typically less direct than sparse Cox models.
+
+\section{Deep learning and multi-omics integration}
+A common deep survival approach is to model a non-linear risk score $f_\theta(x)$ using a neural network, and replace $x^\top\beta$ in the Cox model with $f_\theta(x)$. The \emph{negative partial log-likelihood} loss is:
+\begin{equation}
+\mathcal{L}(\theta)
+=
+-\sum_{i:\Delta_i=1}
+\left[
+f_\theta(x_i) - \log\!\left(\sum_{j\in \mathcal{R}(\tilde T_i)}\exp(f_\theta(x_j))\right)
+\right],
+\label{eq:deepcox_loss}
+\end{equation}
+as popularized by DeepSurv \citep{Katzman2018}. Genomic applications often incorporate multi-omics by concatenation, modality-specific subnetworks, or latent fusion representations, but must manage overfitting when $n$ is modest.
+
+\section{Competing risks analysis in genomics}
+In genomic studies, the event of interest is often \emph{not} the only way follow-up can terminate. For example:
+\begin{itemize}
+  \item \textbf{Cancer-specific death} vs \textbf{death from other causes} (especially in older cohorts and long follow-up),
+  \item \textbf{Recurrence/progression} vs \textbf{death without recurrence} (disease-free survival settings),
+  \item \textbf{Relapse} vs \textbf{non-relapse mortality} in transplant/immuno-oncology cohorts.
+\end{itemize}
+These settings require competing risks methods because treating competing events as independent censoring generally yields biased estimates of event probabilities.
+
+\subsection{Cause-specific hazards and the cumulative incidence function}
+Let $K\in\{1,\dots,J\}$ denote failure type. The \emph{cause-specific hazard} for cause $k$ is
+\begin{equation}
+h_k(t\mid x)=\lim_{\Delta t\downarrow 0}\frac{\Pr(t\le T<t+\Delta t,\ K=k\mid T\ge t,\ x)}{\Delta t}.
+\label{eq:csh}
+\end{equation}
+A Cox-type model is often assumed for each cause:
+\[
+h_k(t\mid x)=h_{0k}(t)\exp(x^\top\beta_k),
+\]
+which is attractive in genomics because it aligns with the familiar Cox machinery and allows \(\beta_k\) to be estimated with partial likelihood by treating other causes as censored (but \emph{only} for estimating cause-specific hazards).
+
+The estimand that many clinical genomic questions care about is the \emph{cumulative incidence function (CIF)}:
+\begin{equation}
+F_k(t\mid x)=\Pr(T\le t,\ K=k\mid x).
+\label{eq:cif}
+\end{equation}
+In general, \(F_k(t)\) depends on all cause-specific hazards through
+\[
+F_k(t\mid x)=\int_0^t S(u\mid x)\,h_k(u\mid x)\,du,
+\qquad
+S(u\mid x)=\exp\!\left(-\int_0^u \sum_{\ell=1}^J h_\ell(s\mid x)\,ds\right),
+\]
+so modeling a single cause-specific hazard does not directly parameterize \(F_k\).
+
+\subsection{Fine--Gray model for the subdistribution hazard}
+Fine and Gray proposed a proportional hazards model targeting the CIF directly via the \emph{subdistribution hazard} \citep{FineGray1999}:
+\begin{equation}
+\tilde h_k(t\mid x)
+=
+\lim_{\Delta t\downarrow 0}\frac{\Pr(t\le T<t+\Delta t,\ K=k\mid T\ge t\ \text{or}\ (T<t, K\ne k),\ x)}{\Delta t}.
+\label{eq:fg_subhaz}
+\end{equation}
+The Fine--Gray proportional subdistribution hazards (PSH) model assumes
+\begin{equation}
+\tilde h_k(t\mid x)=\tilde h_{0k}(t)\exp(x^\top\gamma_k),
+\label{eq:fg_ph}
+\end{equation}
+where \(\gamma_k\) is interpretable in terms of relative changes to the CIF for cause \(k\).
+In genomic prognostic modeling, Fine--Gray is often preferred when the scientific target is the absolute risk of a specific event type by time \(t\) (e.g., cancer-specific death by 5 years), rather than the instantaneous cause-specific hazard.
+
+\subsection{Testing and group comparisons}
+When comparing CIFs across groups (e.g., molecular subtypes), Gray's test is a standard nonparametric approach \citep{Gray1988}. This is a common first step in genomics papers: stratify by subtype/signature, estimate CIFs for each competing event, then proceed to regression modeling.
+
+\subsection{High-dimensional competing risks methods relevant to genomics}
+Competing risks with genomics features inherits the same large-$p$ small-$n$ constraints as standard survival analysis, but now with multiple event processes and competing estimands (cause-specific vs CIF). Several method families are explicitly developed for high-dimensional competing risks and have been used in microarray/genomic contexts:
+
+\paragraph{Boosting for proportional subdistribution hazards.}
+\citet{Binder2009} proposed a boosting approach for fitting Fine--Gray PSH models in high-dimensional settings, explicitly motivated by microarray-type predictors and demonstrating how to combine clinical covariates with many molecular features.
+
+\paragraph{Penalized regression and computational scaling.}
+Penalized Fine--Gray models (e.g., LASSO/elastic net) have been studied with a focus on scalable fitting and screening rules; for example, PSH-SAFE provides safe feature elimination for penalized Fine--Gray regression \citep{PSHSAFE2022}. These tools are practical when $p$ is large and competing risks regression must be re-fit repeatedly during cross-validation.
+
+\paragraph{Inference and stability in high dimensions.}
+Beyond point estimation, uncertainty quantification is an active area. \citet{Cui2019EJS} develops inference for regression coefficients in a high-dimensional Fine--Gray model. For stable feature selection under correlated predictors (typical in genomics), methods such as Random Approximate Elastic Net (RAEN) have been proposed within the PSH framework \citep{RAEN2023}.
+
+\subsection{Practical guidance for genomics writeups: choosing the estimand}
+A helpful rule of thumb is:
+\begin{itemize}
+  \item Use \textbf{cause-specific Cox} when interpreting biological mechanisms of instantaneous risk for each event type (and when modeling each cause is itself the target).
+  \item Use \textbf{Fine--Gray} when predicting or comparing \textbf{absolute risk} (CIF) of a particular event type by a clinically meaningful horizon.
+\end{itemize}
+Many genomics studies benefit from reporting both: cause-specific hazard ratios (mechanistic interpretation) and CIF-based predictions (clinical risk).
+
+\section{Evaluation metrics that recur in genomic survival papers}
+\subsection{Concordance index (C-index)}
+The C-index measures the fraction of comparable pairs where predicted risk is correctly ordered. Let $\eta_i$ be a risk score (larger means higher risk). A common estimator is:
+\begin{equation}
+\widehat{C}
+=
+\frac{\sum_{i\ne j}\mathbf{1}(\tilde T_i < \tilde T_j,\ \Delta_i=1)\,\mathbf{1}(\eta_i>\eta_j)}
+{\sum_{i\ne j}\mathbf{1}(\tilde T_i < \tilde T_j,\ \Delta_i=1)}.
+\label{eq:cindex}
+\end{equation}
+In genomics, the C-index is popular but can be optimistic if tuning/feature selection is not nested within validation.
+
+\subsection{Time-dependent AUC with inverse probability of censoring weights (IPCW)}
+For a fixed horizon $t$, one can define ``cases'' as those with $T\le t$ and ``controls'' as those with $T>t$, and weight observations to adjust for censoring. A typical IPCW weight uses the censoring survival function $\hat G(\cdot)$:
+\[
+w_i(t)=\frac{\mathbf{1}(\tilde T_i \le t,\ \Delta_i=1)}{\hat G(\tilde T_i)}
+\quad\text{or}\quad
+w_i(t)=\frac{\mathbf{1}(\tilde T_i > t)}{\hat G(t)},
+\]
+depending on the chosen definition. The key theme is that censoring-adjusted metrics are preferred when censoring is substantial and heterogeneous.
+
+\section{Applications and data resources}
+\subsection{From discovery signatures to clinical assays}
+Early gene expression studies showed that prognostic signatures can stratify breast cancer patients by risk of distant metastasis \citep{VantVeer2002}. Subsequent work translated multigene signatures into clinical assays used to guide treatment decisions; a prominent example is the 21-gene recurrence score for tamoxifen-treated, node-negative breast cancer \citep{Paik2004}. These case studies underscore (i) strong internal validation discipline and (ii) the necessity of external cohort replication.
+
+\subsection{Pan-cancer modeling with TCGA}
+TCGA and related resources are widely used for benchmarking and pan-cancer prognostic modeling \citep{Weinstein2013,Tomczak2015}. Because endpoints and follow-up differ by cancer type, harmonized endpoint definitions (e.g., TCGA-CDR) and careful attention to missingness and covariate shift are critical for high-quality survival analytics \citep{Liu2018}.
+
+\section{Left truncation and right censoring in genomic cohorts}
+Many genomic survival datasets (especially biobank-scale resources and retrospective clinical cohorts) exhibit \emph{right censoring} and may also exhibit \emph{left truncation} (delayed entry). Left truncation occurs when individuals enter the risk set only after surviving to an entry time $E_i$ (e.g., time from diagnosis to sequencing/consent), so the observed sample is conditional on $T_i \ge E_i$ \citep{KleinMoeschberger2003}. Ignoring left truncation typically biases hazard estimates and can distort genomic effect sizes, particularly when entry depends on disease severity or healthcare access.
+
+\subsection{Data structure with delayed entry}
+With delayed entry, each subject has an entry time $E_i$ and the at-risk indicator becomes
+\begin{equation}
+Y_i(t)=\mathbf{1}(E_i \le t \le \tilde T_i),
+\label{eq:delayed_entry_Y}
+\end{equation}
+while right censoring remains encoded via $(\tilde T_i,\Delta_i)$ as before. In genomics, $E_i$ is often the time of biospecimen availability, sequencing, or enrollment into a molecular profiling program, which can be substantially after diagnosis.
+
+\subsection{Cox partial likelihood with left truncation}
+The Cox partial likelihood extends directly by redefining the risk set to include only individuals who have entered by $t$ and have not yet had an event/censoring:
+\[
+\mathcal{R}(t)=\{j:\ E_j \le t \le \tilde T_j\}.
+\]
+Thus the partial likelihood retains the same form as \eqref{eq:cox_partial_lik}, but with the delayed-entry risk set:
+\begin{equation}
+L(\beta)=\prod_{d=1}^{D}\frac{\exp(x_{i_d}^\top\beta)}{\sum_{j\in \mathcal{R}(t_{(d)})}\exp(x_j^\top\beta)}.
+\label{eq:cox_partial_lik_left_trunc}
+\end{equation}
+This is the standard approach implemented in mainstream software (e.g., \texttt{Surv(entry, exit, event)} in \texttt{R}).
+
+\subsection{Counting-process view and implications for omics pipelines}
+Under a counting-process formulation, delayed entry modifies $Y_i(t)$ but keeps the martingale structure used for asymptotic theory and robust variance estimation \citep{AndersenGill1982}. Practically, the key implications for genomic survival modeling are:
+\begin{itemize}
+  \item \textbf{Preprocessing and eligibility}: if molecular data are available only for those who survive to profiling, the analytic cohort can be enriched for longer survivors. This is common in retrospective tumor sequencing and can create ``immortal time''-like artifacts unless entry times are modeled.
+  \item \textbf{Feature selection and validation}: left truncation must be respected inside cross-validation folds (risk sets and baseline hazard estimation depend on $E_i$). Leakage can be more subtle when folds have different entry-time distributions.
+  \item \textbf{Multi-omics and longitudinal sampling}: when omics are collected at multiple times, each measurement can induce its own ``entry'' (time-varying covariates). Landmarking or joint models may be preferable when omics are only observed after certain survival milestones.
+\end{itemize}
+
+\subsection{When to worry most in genomics}
+Left truncation is most severe when (i) sequencing/enrollment occurs long after diagnosis, (ii) entry time is associated with prognosis or care pathways, or (iii) the study is assembled from survivors (prevalent cases). In these settings, robust reporting should include the distribution of entry times, the fraction of subjects with delayed entry, and sensitivity analyses comparing models with and without truncation adjustment \citep{KleinMoeschberger2003}.
+
+\subsection{High-dimensional methods under left truncation: what changes mathematically}
+From a modeling standpoint, most high-dimensional survival methods extend to left truncation by \emph{the same principle}: keep the model/loss, but compute it using the delayed-entry risk set \(\mathcal{R}(t)=\{j:\ E_j \le t \le \tilde T_j\}\).
+For example, the LASSO Cox objective becomes
+\begin{equation}
+\hat\beta(\lambda)
+=
+\arg\max_{\beta}\left\{
+\sum_{i:\Delta_i=1}\left[
+x_i^\top\beta - \log\!\left(\sum_{j:\,E_j \le \tilde T_i \le \tilde T_j}\exp(x_j^\top\beta)\right)
+\right]
+-\lambda\|\beta\|_1
+\right\}.
+\label{eq:lasso_cox_left_trunc}
+\end{equation}
+Algorithmically, coordinate descent and other convex-optimization routines are unchanged, but the bookkeeping of risk sets (and quantities derived from them) must reflect entry times.
+
+A practically important takeaway is that \emph{model selection must also be truncation-aware}: cross-validation should compute partial-likelihood deviance using delayed-entry risk sets in each fold, otherwise tuning can implicitly optimize the wrong target.
+
+\subsection{Clinico-genomic evidence: penalized Cox with delayed entry}
+Left truncation is not only a theoretical nuance---it has been shown to materially affect both estimation and prediction in high-dimensional, real-world clinico-genomic survival modeling.
+\citet{McGough2021} studied penalized Cox models (including LASSO) under left-truncated and right-censored follow-up and demonstrated that failure to adjust for truncation can induce substantial bias and miscalibration; their paper also provides a clear simulation framework and a motivating analysis in a high-dimensional clinico-genomic database.
+
+Complementarily, \citet{Brown2022} focuses on the \emph{selection bias mechanism} in clinical genomic studies: genomic profiling often occurs months/years after diagnosis, so those who die or are lost before profiling are systematically excluded. They discuss the resulting length-bias and illustrate how delayed-entry methods correct naïve survival comparisons in clinico-genomic cohorts.
+
+\subsection{Beyond Cox: trees/forests and deep models for LTRC data}
+While Cox-based methods dominate genomics due to interpretability and software maturity, delayed entry also arises in settings where non-linear models are attractive (e.g., heterogeneous treatment effects, high-order interactions).
+Tree-based methods have been explicitly generalized to left-truncated right-censored (LTRC) data; for instance, \citet{FuSimonoff2016} proposes survival tree constructions for LTRC data and connects them to time-varying covariate survival trees.
+More recently, survival forests for LTRC data have been developed \citep{LaurentVoVan2024}.
+On the deep-learning side, \citet{Seo2025} proposes a neural-network approach designed to incorporate left truncation alongside right censoring in cancer survival settings.
+
+\subsection{What to emphasize in a genomics writeup}
+If you want the left-truncation section to feel ``genomics-native,'' the most compelling points to highlight are:
+\begin{itemize}
+  \item \textbf{The origin time vs profiling time mismatch}: diagnosis/treatment start is the scientific time origin, while sequencing is the entry time.
+  \item \textbf{Truncation-aware evaluation}: tuning and performance estimation must be done with delayed-entry risk sets inside CV folds.
+  \item \textbf{Sensitivity analyses}: report entry-time distributions and rerun key models under different plausible origins (diagnosis vs treatment line start), especially in real-world clinico-genomic databases.
+\end{itemize}
+
+\section{Practical issues (pitfalls) in genomic survival modeling}
+\subsection{Leakage and ``double dipping''}
+If screening/normalization/gene selection uses all samples before cross-validation, performance estimates are biased upward. Best practice is \emph{fully nested} resampling where every preprocessing step that uses outcome information is performed inside each training fold \citep{vanWieringen2009}.
+
+\subsection{Batch effects and confounding}
+Omics measurements can contain technical variation correlated with site, sequencing batch, or processing date. If these factors also correlate with prognosis or treatment, batch effects can mimic biological signals. This makes transparent preprocessing and sensitivity analyses essential.
+
+\subsection{Interpretability and stability}
+Sparse Cox is interpretable ($\beta$ maps to hazard ratios), but correlated genes can make selected sets unstable. Elastic net and pathway/group penalties can improve stability \citep{Simon2011}. For RSF and deep models, interpretation requires post-hoc summaries (importance, partial dependence), ideally at pathway/module level.
+
+\section{Future directions}
+Below are research directions that appear especially promising for ``survival analysis in genomics'' and fit naturally into an advanced survival analysis course discussion.
+
+\subsection{(1) Transportability and external validity across cohorts}
+Genomic predictors often degrade when moved across studies due to differences in platforms, processing pipelines, population composition, treatment standards, and censoring patterns. Methodological gaps include:
+\begin{itemize}
+  \item domain adaptation for censored outcomes (including recalibration of baseline hazards),
+  \item evaluation protocols that separate \emph{within-cohort} CV from \emph{cross-cohort} generalization,
+  \item explicit modeling of covariate shift and label shift in survival settings.
+\end{itemize}
+
+\subsection{(2) Competing risks and multi-state models in molecular oncology}
+Many cancer datasets involve competing events (e.g., cancer-specific vs other-cause mortality) or multi-state trajectories (diagnosis $\to$ progression $\to$ death). Genomic studies frequently simplify to OS, but richer modeling could leverage:
+\begin{itemize}
+  \item cause-specific hazards and subdistribution hazards,
+  \item transition-specific genomics effects in multi-state models,
+  \item joint modeling of longitudinal biomarkers and survival.
+\end{itemize}
+
+\subsection{(3) Dynamic prediction with longitudinal genomics}
+Increasingly, genomics is measured repeatedly (liquid biopsies, serial tumor biopsies, longitudinal single-cell). This motivates:
+\begin{itemize}
+  \item landmarking and time-varying coefficient models,
+  \item joint models linking evolving molecular markers to hazard,
+  \item representation learning for irregularly sampled longitudinal omics.
+\end{itemize}
+
+\subsection{(4) Integrating biological structure: pathways, networks, and priors}
+Genes operate in pathways and interaction networks, suggesting structured penalties and Bayesian priors:
+\begin{itemize}
+  \item group LASSO / sparse group penalties aligned to pathways,
+  \item graph-guided fused penalties to encourage smoothness over gene networks,
+  \item hierarchical Bayesian survival models borrowing strength across related genes or modules.
+\end{itemize}
+A key open question is how to preserve interpretability while improving stability and reproducibility.
+
+\subsection{(5) Uncertainty quantification for high-dimensional and deep survival models}
+Genomic survival models are often used for decision support, where uncertainty matters. Promising directions include:
+\begin{itemize}
+  \item post-selection inference for penalized Cox,
+  \item Bayesian neural survival models with calibrated predictive intervals,
+  \item conformal prediction ideas adapted to censoring (for time-to-event risk sets).
+\end{itemize}
+
+\subsection{(6) Robustness to endpoint noise and label quality}
+Clinical endpoints (especially PFS/DFS) can be inconsistently recorded across institutions. Harmonization efforts like TCGA-CDR help \citep{Liu2018}, but future work could incorporate:
+\begin{itemize}
+  \item measurement-error models for event times,
+  \item sensitivity analyses for endpoint definition variation,
+  \item semi-supervised approaches that exploit unlabeled/weakly labeled survival data.
+\end{itemize}
+
+\section{Conclusion}
+Survival analysis in genomics sits at the intersection of classical time-to-event modeling and modern high-dimensional learning. Core formulations---Cox partial likelihood, penalized objectives, and censoring-aware metrics---underpin much of the literature, while RSF and deep survival models expand expressivity for multi-omics integration. Future progress will likely depend on cross-cohort generalization, richer event-process modeling (competing risks/multi-state), principled uncertainty quantification, and better integration of biological structure.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
