@@ -6,6 +6,8 @@
 \usepackage{hyperref}
 \usepackage[numbers]{natbib}
 \usepackage{mathtools}
+\usepackage{tabularx}
+\usepackage{array}
 
 \title{Survival Analysis in Genomics: Models, Methods, Key Equations, and Future Directions \\ \vspace{1em} \large{Written Assignment submitted for Advanced Survival Class}}
 \author{Moran Guo}
@@ -330,18 +332,34 @@ Sparse Cox is interpretable ($\beta$ maps to hazard ratios), but correlated gene
 \begin{table}[t]
 \centering
 \caption{Evidence snapshots from representative studies used in this review.}
-\begin{tabular}{p{2.1cm}p{2.2cm}p{2.8cm}p{2.8cm}p{4.3cm}}
+\label{tab:evidence_snapshots}
+{\footnotesize
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{
+>{\raggedright\arraybackslash}p{1.8cm}
+>{\raggedright\arraybackslash}p{2.3cm}
+>{\raggedright\arraybackslash}p{2.4cm}
+>{\raggedright\arraybackslash}p{2.2cm}
+>{\raggedright\arraybackslash}X
+}
 \toprule
 Study & Data context & Endpoint context & Model class & Key quantitative takeaway \\
 \midrule
 Ishwaran 2008 & Simulations + coronary artery bypass grafting cohort & Right-censored survival & Random survival forests & OOB prediction error closely tracked test error across settings; demonstrated robust survival-forest workflow for censored outcomes \citep{Ishwaran2008}. \\
+\addlinespace[0.25em]
 Katzman 2018 & METABRIC, SUPPORT, Rotterdam/GBSG & Overall survival/time-to-event benchmarks & Deep Cox neural network & C-index: METABRIC 0.654 (DeepSurv) vs 0.632 (Cox) vs 0.620 (RSF); transfer Rotterdam\(\rightarrow\)GBSG 0.676 vs 0.659 vs 0.648 \citep{Katzman2018}. \\
+\addlinespace[0.25em]
 Binder 2009 & High-dimensional microarray + clinical covariates & Competing risks CIF prediction & Boosted Fine--Gray PSH & Adapted bootstrap $.632+$ prediction-error curves for competing-risks validation in high-dimensional settings \citep{Binder2009}. \\
+\addlinespace[0.25em]
 McGough 2021 & Stage IV NSCLC clinicogenomic cohort (\(n=4429\)) & Left-truncated, right-censored survival & Penalized Cox (LTRC-aware) & 21.5\% had delayed entry \(>1\) year; diagnosis year and truncation time had \(\rho=-0.63\), motivating explicit delayed-entry adjustment \citep{McGough2021}. \\
+\addlinespace[0.25em]
 Brown 2022 & Clinicogenomic NSCLC/CRC cohorts & Overall survival with delayed profiling entry & Bias assessment under delayed entry & Ignoring delayed entry overestimated median OS by \(>1\) year in stage IV NSCLC/CRC examples \citep{Brown2022}. \\
+\addlinespace[0.25em]
 Liu 2018 & TCGA-CDR (33 cancers, 11{,}160 patients) & Harmonized OS/PFI/DFI/DSS endpoints & Data harmonization for survival analytics & Large-scale endpoint harmonization reduced ambiguity in pan-cancer prognostic analyses and enabled more consistent cross-cancer benchmarking \citep{Liu2018}. \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
+}
 \end{table}
 
 \section{Future directions}
