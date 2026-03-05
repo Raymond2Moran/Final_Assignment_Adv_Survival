@@ -1,6 +1,6 @@
 \documentclass[11pt]{article}
 
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=0.8in]{geometry}
 \usepackage{amsmath, amssymb, amsthm}
 \usepackage{booktabs}
 \usepackage{hyperref}
@@ -11,13 +11,18 @@
 
 \title{Survival Analysis in Genomics: Models, Methods, Key Equations, and Future Directions \\ \vspace{1em} \large{Written Assignment submitted for Advanced Survival Class}}
 \author{Moran Guo}
-\date{March 1, 2026}
+\date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
 Genomics has transformed biomedical research by enabling high-dimensional molecular measurements (e.g., gene expression, somatic mutations, copy-number variation, methylation, proteomics) at cohort scale. Many impactful questions are time-to-event in nature, including overall survival, progression-free survival, time to recurrence, and time to treatment resistance. This review surveys survival analysis methods used in genomics, emphasizing (i) classical semiparametric modeling, (ii) high-dimensional regularization and dimension reduction, (iii) modern machine learning and deep learning, and (iv) practical evaluation issues. We highlight core mathematical formulations that recur throughout the literature and conclude with forward-looking research directions.
+
+This review, as a course report, highlights some sections discussed in class (Section~\ref{sec:notations}, ~\ref{sec:classical-foundations}, ~\ref{sec:cause-specific-cif}-~\ref{sec:fine-gray},~\ref{sec:practical-guide},~\ref{sec:delay-entry}-~\ref{sec:cox-model-left-truncation}), and a big proportion of it offers an extension beyond what is covered in class to provide some novel approaches to the specific problems that are addressing (e.g., high-dimensionality: Section~\ref{sec:high-dimensional-methods}), or just an extension of current methods (e.g., Peanalized Cox and its extension under left-truncation: Section~\ref{sec:lasso-cox} and~\ref{sec:lasso-cox-highdim}). Machine learning and recently emerged deep learning models are also mentioned in the review (Section~\ref{sec:ml}, ~\ref{sec:dl}), with less focus on needy-greedy details. A summary of key takeaways for a subset of papers are included in Table~\ref{tab:evidence_snapshots}. \textit{Importantly}, this report is intended as a synthesis of existing literature and class material; it does not introduce new methods, new data, or novel empirical findings.
+
+\textit{Given the limited timeframe, I used generative AI tools(Codex by OpenAI) to assist with relevant literature discovery and organization. The writing, interpretation, and overall structure of this review are my own. All citations and literatures are fact-checked.}
+
 \end{abstract}
 
 \section{Introduction}
@@ -26,7 +31,7 @@ The Cox proportional hazards (PH) model is foundational due to interpretability 
 
 Large public resources such as The Cancer Genome Atlas (TCGA) catalyzed method development by providing multi-omics measurements linked to clinical outcomes \citep{Weinstein2013,Tomczak2015,Liu2018}. Early microarray studies demonstrated that gene expression signatures can stratify patients by recurrence and metastasis risk \citep{VantVeer2002,Paik2004}.
 
-\section{Notation and data structure (genomics survival)}
+\section{Notation and data structure (genomics survival)}\label{sec:notations}
 For individual $i=1,\dots,n$, observe:
 \[
 T_i = \text{event time}, \quad C_i = \text{censoring time}, \quad
@@ -38,7 +43,8 @@ Define the counting-process style at-risk indicator and event indicator:
 Y_i(t) = \mathbf{1}(\tilde T_i \ge t), \qquad N_i(t) = \mathbf{1}(\tilde T_i \le t,\ \Delta_i=1).
 \]
 
-\section{Classical survival modeling foundations}
+\section{Classical survival modeling foundations}\label{sec:classical-foundations}
+
 \subsection{Cox proportional hazards model}
 The Cox PH model posits:
 \begin{equation}
@@ -84,7 +90,7 @@ yielding individual survival curves:
 In genomics, $p$ is often $10^3$--$10^5$ while $n$ may be $10^2$--$10^3$, so unconstrained estimation of $\beta$ is ill-posed. This motivates feature screening, shrinkage/regularization, and dimension reduction.
 
 \section{High-dimensional regularization and feature selection}
-\subsection{Penalized Cox regression}
+\subsection{Penalized Cox regression}\label{sec:lasso-cox}
 The LASSO Cox model solves \citep{Tibshirani1997}:
 \begin{equation}
 \hat\beta(\lambda)
@@ -114,7 +120,7 @@ x_i \in \mathbb{R}^p
 \;\hat h(t\mid z_i).
 \]
 
-\section{Machine learning methods for genomic survival}
+\section{Machine learning methods for genomic survival}\label{sec:ml}
 \subsection{Random survival forests}
 Random survival forests (RSF) build an ensemble of survival trees and average estimated cumulative hazards \citep{Ishwaran2008}. Conceptually, for a tree $b$ producing a terminal node $\nu_b(x)$ for covariates $x$, RSF estimates a node-specific cumulative hazard $\hat H_b(t\mid x)$ and averages:
 \begin{equation}
@@ -126,10 +132,7 @@ Random survival forests (RSF) build an ensemble of survival trees and average es
 RSF can capture non-linearities and interactions (useful for multi-gene effects), but interpretability typically requires post-hoc tools.
 In the original RSF development paper, the method was evaluated in both simulation and clinical survival data, with explicit survival-specific splitting rules and out-of-bag (OOB) error estimation tailored to right-censored outcomes \citep{Ishwaran2008}. The authors also demonstrated the framework on a coronary artery bypass grafting cohort and emphasized that OOB error closely tracked held-out test error across settings, which is practically useful for high-dimensional genomics workflows where external validation cohorts are limited \citep{Ishwaran2008}.
 
-\subsection{Support vector survival methods}
-Support vector approaches often frame survival prediction as a ranking problem, aiming to order subjects by risk while handling censoring \citep{VanBelle2011}. These can be competitive in high-dimensional settings, though biological interpretability is typically less direct than sparse Cox models.
-
-\section{Deep learning and multi-omics integration}
+\section{Deep learning and multi-omics integration}\label{sec:dl}
 A common deep survival approach is to model a non-linear risk score $f_\theta(x)$ using a neural network, and replace $x^\top\beta$ in the Cox model with $f_\theta(x)$. The \emph{negative partial log-likelihood} loss is:
 \begin{equation}
 \mathcal{L}(\theta)
@@ -152,10 +155,10 @@ In genomic studies, the event of interest is often \emph{not} the only way follo
 \end{itemize}
 These settings require competing risks methods because treating competing events as independent censoring generally yields biased estimates of event probabilities.
 
-\subsection{Cause-specific hazards and the cumulative incidence function}
+\subsection{Cause-specific hazards and the cumulative incidence function}\label{sec:cause-specific-cif}
 Let $K\in\{1,\dots,J\}$ denote failure type. The \emph{cause-specific hazard} for cause $k$ is
 \begin{equation}
-h_k(t\mid x)=\lim_{\Delta t\downarrow 0}\frac{\Pr(t\le T<t+\Delta t,\ K=k\mid T\ge t,\ x)}{\Delta t}.
+h_k(t\mid x)=\lim_{\Delta t\rightarrow 0}\frac{\Pr(t\le T<t+\Delta t,\ K=k\mid T\ge t,\ x)}{\Delta t}.
 \label{eq:csh}
 \end{equation}
 A Cox-type model is often assumed for each cause:
@@ -177,7 +180,7 @@ S(u\mid x)=\exp\!\left(-\int_0^u \sum_{\ell=1}^J h_\ell(s\mid x)\,ds\right),
 \]
 so modeling a single cause-specific hazard does not directly parameterize \(F_k\).
 
-\subsection{Fine--Gray model for the subdistribution hazard}
+\subsection{Fine--Gray model for the subdistribution hazard}\label{sec:fine-gray}
 Fine and Gray proposed a proportional hazards model targeting the CIF directly via the \emph{subdistribution hazard} \citep{FineGray1999}:
 \begin{equation}
 \tilde h_k(t\mid x)
@@ -193,10 +196,7 @@ The Fine--Gray proportional subdistribution hazards (PSH) model assumes
 where \(\gamma_k\) is interpretable in terms of relative changes to the CIF for cause \(k\).
 In genomic prognostic modeling, Fine--Gray is often preferred when the scientific target is the absolute risk of a specific event type by time \(t\) (e.g., cancer-specific death by 5 years), rather than the instantaneous cause-specific hazard.
 
-\subsection{Testing and group comparisons}
-When comparing CIFs across groups (e.g., molecular subtypes), Gray's test is a standard nonparametric approach \citep{Gray1988}. This is a common first step in genomics papers: stratify by subtype/signature, estimate CIFs for each competing event, then proceed to regression modeling.
-
-\subsection{High-dimensional competing risks methods relevant to genomics}
+\subsection{High-dimensional competing risks methods relevant to genomics}\label{sec:high-dimensional-methods}
 Competing risks with genomics features inherits the same large-$p$ small-$n$ constraints as standard survival analysis, but now with multiple event processes and competing estimands (cause-specific vs CIF). Several method families are explicitly developed for high-dimensional competing risks and have been used in microarray/genomic contexts:
 
 \paragraph{Boosting for proportional subdistribution hazards.}
@@ -208,7 +208,7 @@ Penalized Fine--Gray models (e.g., LASSO/elastic net) have been studied with a f
 \paragraph{Inference and stability in high dimensions.}
 Beyond point estimation, uncertainty quantification is an active area. \citet{HouBradicXu2019EJS} develops one-step bias-corrected inference for high-dimensional Fine--Gray regression, enabling confidence intervals and hypothesis testing for selected effects even in $p>n$ regimes. Their application to non-cancer mortality among prostate cancer patients illustrates why this matters in practice: genomic and clinical signals can have different roles for incidence prediction vs inferential interpretation \citep{HouBradicXu2019EJS}. For stable feature selection under correlated predictors (typical in genomics), methods such as Random Approximate Elastic Net (RAEN) have been proposed within the PSH framework \citep{RAEN2023}.
 
-\subsection{Practical guidance for genomics writeups: choosing the estimand}
+\subsection{Practical guidance for genomics writeups: choosing the estimand}\label{sec:practical-guide}
 A helpful rule of thumb is:
 \begin{itemize}
   \item Use \textbf{cause-specific Cox} when interpreting biological mechanisms of instantaneous risk for each event type (and when modeling each cause is itself the target).
@@ -247,7 +247,7 @@ TCGA and related resources are widely used for benchmarking and pan-cancer progn
 \section{Left truncation and right censoring in genomic cohorts}
 Many genomic survival datasets (especially biobank-scale resources and retrospective clinical cohorts) exhibit \emph{right censoring} and may also exhibit \emph{left truncation} (delayed entry). Left truncation occurs when individuals enter the risk set only after surviving to an entry time $E_i$ (e.g., time from diagnosis to sequencing/consent), so the observed sample is conditional on $T_i \ge E_i$ \citep{KleinMoeschberger2003}. Ignoring left truncation typically biases hazard estimates and can distort genomic effect sizes, particularly when entry depends on disease severity or healthcare access.
 
-\subsection{Data structure with delayed entry}
+\subsection{Data structure with delayed entry}\label{sec:delay-entry}
 With delayed entry, each subject has an entry time $E_i$ and the at-risk indicator becomes
 \begin{equation}
 Y_i(t)=\mathbf{1}(E_i \le t \le \tilde T_i),
@@ -255,7 +255,7 @@ Y_i(t)=\mathbf{1}(E_i \le t \le \tilde T_i),
 \end{equation}
 while right censoring remains encoded via $(\tilde T_i,\Delta_i)$ as before. In genomics, $E_i$ is often the time of biospecimen availability, sequencing, or enrollment into a molecular profiling program, which can be substantially after diagnosis.
 
-\subsection{Cox partial likelihood with left truncation}
+\subsection{Cox partial likelihood with left truncation}\label{sec:cox-model-left-truncation}
 The Cox partial likelihood extends directly by redefining the risk set to include only individuals who have entered by $t$ and have not yet had an event/censoring:
 \[
 \mathcal{R}(t)=\{j:\ E_j \le t \le \tilde T_j\}.
@@ -265,20 +265,10 @@ Thus the partial likelihood retains the same form as \eqref{eq:cox_partial_lik},
 L(\beta)=\prod_{d=1}^{D}\frac{\exp(x_{i_d}^\top\beta)}{\sum_{j\in \mathcal{R}(t_{(d)})}\exp(x_j^\top\beta)}.
 \label{eq:cox_partial_lik_left_trunc}
 \end{equation}
-This is the standard approach implemented in mainstream software (e.g., \texttt{Surv(entry, exit, event)} in \texttt{R}).
+This is the standard approach implemented in data anlaysis software (e.g., \texttt{Surv(entry, exit, event)} in \texttt{R}).
 
-\subsection{Counting-process view and implications for omics pipelines}
-Under a counting-process formulation, delayed entry modifies $Y_i(t)$ but keeps the martingale structure used for asymptotic theory and robust variance estimation \citep{AndersenGill1982}. Practically, the key implications for genomic survival modeling are:
-\begin{itemize}
-  \item \textbf{Preprocessing and eligibility}: if molecular data are available only for those who survive to profiling, the analytic cohort can be enriched for longer survivors. This is common in retrospective tumor sequencing and can create ``immortal time''-like artifacts unless entry times are modeled.
-  \item \textbf{Feature selection and validation}: left truncation must be respected inside cross-validation folds (risk sets and baseline hazard estimation depend on $E_i$). Leakage can be more subtle when folds have different entry-time distributions.
-  \item \textbf{Multi-omics and longitudinal sampling}: when omics are collected at multiple times, each measurement can induce its own ``entry'' (time-varying covariates). Landmarking or joint models may be preferable when omics are only observed after certain survival milestones.
-\end{itemize}
 
-\subsection{When to worry most in genomics}
-Left truncation is most severe when (i) sequencing/enrollment occurs long after diagnosis, (ii) entry time is associated with prognosis or care pathways, or (iii) the study is assembled from survivors (prevalent cases). In these settings, robust reporting should include the distribution of entry times, the fraction of subjects with delayed entry, and sensitivity analyses comparing models with and without truncation adjustment \citep{KleinMoeschberger2003}.
-
-\subsection{High-dimensional methods under left truncation: what changes mathematically}
+\subsection{High-dimensional methods under left truncation: what changes mathematically}\label{sec:lasso-cox-highdim}
 From a modeling standpoint, most high-dimensional survival methods extend to left truncation by \emph{the same principle}: keep the model/loss, but compute it using the delayed-entry risk set \(\mathcal{R}(t)=\{j:\ E_j \le t \le \tilde T_j\}\).
 For example, the LASSO Cox objective becomes
 \begin{equation}
@@ -297,7 +287,7 @@ Algorithmically, coordinate descent and other convex-optimization routines are u
 A practically important takeaway is that \emph{model selection must also be truncation-aware}: cross-validation should compute partial-likelihood deviance using delayed-entry risk sets in each fold, otherwise tuning can implicitly optimize the wrong target.
 
 \subsection{Clinico-genomic evidence: penalized Cox with delayed entry}
-Left truncation is not only a theoretical nuance---it has been shown to materially affect both estimation and prediction in high-dimensional, real-world clinico-genomic survival modeling.
+Left truncation has been shown by researchers to affect both estimation and prediction in high-dimensional, real-world clinico-genomic survival modeling.
 \citet{McGough2021} studied penalized Cox models (including LASSO) under left-truncated and right-censored follow-up and demonstrated that failure to adjust for truncation can induce substantial bias and miscalibration; their paper also provides a clear simulation framework and a motivating analysis in a high-dimensional clinico-genomic database. In their stage IV NSCLC clinico-genomic analysis (\(n=4429\)), 21.5\% of patients had delayed entry greater than one year, and the correlation between diagnosis year and truncation time was strongly negative (\(\rho=-0.63\)), quantitatively highlighting that delayed entry is structured rather than random \citep{McGough2021}.
 
 Complementarily, \citet{Brown2022} focuses on the \emph{selection bias mechanism} in clinical genomic studies: genomic profiling often occurs months/years after diagnosis, so those who die or are lost before profiling are systematically excluded. In stage IV NSCLC and colorectal cancer examples, they showed that naïve analyses that ignored delayed entry overestimated median overall survival by more than one year relative to risk-set-correct analyses, directly demonstrating the magnitude of this bias in clinicogenomic settings \citep{Brown2022}.
@@ -308,59 +298,16 @@ Tree-based methods have been explicitly generalized to left-truncated right-cens
 More recently, survival forests for LTRC data have been developed \citep{LaurentVoVan2024}.
 On the deep-learning side, \citet{Seo2025} proposes a neural-network approach designed to incorporate left truncation alongside right censoring in cancer survival settings.
 
-\subsection{What to emphasize in a genomics writeup}
-If you want the left-truncation section to feel ``genomics-native,'' the most compelling points to highlight are:
-\begin{itemize}
-  \item \textbf{The origin time vs profiling time mismatch}: diagnosis/treatment start is the scientific time origin, while sequencing is the entry time.
-  \item \textbf{Truncation-aware evaluation}: tuning and performance estimation must be done with delayed-entry risk sets inside CV folds.
-  \item \textbf{Sensitivity analyses}: report entry-time distributions and rerun key models under different plausible origins (diagnosis vs treatment line start), especially in real-world clinico-genomic databases.
-\end{itemize}
-
-\section{Practical issues (pitfalls) in genomic survival modeling}
+\section{Practical issues in genomic survival modeling}
 \subsection{Leakage and ``double dipping''}
 If screening/normalization/gene selection uses all samples before cross-validation, performance estimates are biased upward. Best practice is \emph{fully nested} resampling where every preprocessing step that uses outcome information is performed inside each training fold \citep{vanWieringen2009}.
 
 \subsection{Batch effects and confounding}
 Omics measurements can contain technical variation correlated with site, sequencing batch, or processing date. If these factors also correlate with prognosis or treatment, batch effects can mimic biological signals. This makes transparent preprocessing and sensitivity analyses essential.
 
-\subsection{Endpoint harmonization and label quality}
-Cross-cohort genomic survival studies are also sensitive to outcome-definition drift. The TCGA-CDR harmonization effort curated survival endpoints for 11{,}160 patients across 33 cancer types and reported four standardized outcomes (OS, PFI, DFI, DSS), explicitly to reduce cross-study inconsistencies in endpoint construction \citep{Liu2018}. Practically, if one cohort uses loosely defined progression while another uses stricter radiologic progression, apparent model transportability can degrade for reasons unrelated to biology. For this reason, endpoint-definition documentation should be treated as part of model specification, not merely dataset metadata \citep{Liu2018}.
 
 \subsection{Interpretability and stability}
 Sparse Cox is interpretable ($\beta$ maps to hazard ratios), but correlated genes can make selected sets unstable. Elastic net and pathway/group penalties can improve stability \citep{Simon2011}. For RSF and deep models, interpretation requires post-hoc summaries (importance, partial dependence), ideally at pathway/module level.
-
-\begin{table}[h!]
-\centering
-\caption{Evidence snapshots from representative studies used in this review.}
-\label{tab:evidence_snapshots}
-{\footnotesize
-\setlength{\tabcolsep}{5pt}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\textwidth}{
->{\raggedright\arraybackslash}p{1.8cm}
->{\raggedright\arraybackslash}p{2.3cm}
->{\raggedright\arraybackslash}p{2.4cm}
->{\raggedright\arraybackslash}p{2.2cm}
->{\raggedright\arraybackslash}X
-}
-\toprule
-Study & Data context & Endpoint context & Model class & Key quantitative takeaway \\
-\midrule
-Ishwaran 2008 & Simulations + coronary artery bypass grafting cohort & Right-censored survival & Random survival forests & OOB prediction error closely tracked test error across settings; demonstrated robust survival-forest workflow for censored outcomes \citep{Ishwaran2008}. \\
-\addlinespace[0.25em]
-Katzman 2018 & METABRIC, SUPPORT, Rotterdam/GBSG & Overall survival/time-to-event benchmarks & Deep Cox neural network & C-index: METABRIC 0.654 (DeepSurv) vs 0.632 (Cox) vs 0.620 (RSF); transfer Rotterdam\(\rightarrow\)GBSG 0.676 vs 0.659 vs 0.648 \citep{Katzman2018}. \\
-\addlinespace[0.25em]
-Binder 2009 & High-dimensional microarray + clinical covariates & Competing risks CIF prediction & Boosted Fine--Gray PSH & Adapted bootstrap $.632+$ prediction-error curves for competing-risks validation in high-dimensional settings \citep{Binder2009}. \\
-\addlinespace[0.25em]
-McGough 2021 & Stage IV NSCLC clinicogenomic cohort (\(n=4429\)) & Left-truncated, right-censored survival & Penalized Cox (LTRC-aware) & 21.5\% had delayed entry \(>1\) year; diagnosis year and truncation time had \(\rho=-0.63\), motivating explicit delayed-entry adjustment \citep{McGough2021}. \\
-\addlinespace[0.25em]
-Brown 2022 & Clinicogenomic NSCLC/CRC cohorts & Overall survival with delayed profiling entry & Bias assessment under delayed entry & Ignoring delayed entry overestimated median OS by \(>1\) year in stage IV NSCLC/CRC examples \citep{Brown2022}. \\
-\addlinespace[0.25em]
-Liu 2018 & TCGA-CDR (33 cancers, 11{,}160 patients) & Harmonized OS/PFI/DFI/DSS endpoints & Data harmonization for survival analytics & Large-scale endpoint harmonization reduced ambiguity in pan-cancer prognostic analyses and enabled more consistent cross-cancer benchmarking \citep{Liu2018}. \\
-\bottomrule
-\end{tabularx}
-}
-\end{table}
 
 \section{Future directions}
 
@@ -398,24 +345,46 @@ Genes operate in pathways and interaction networks, suggesting structured penalt
 \end{itemize}
 A key open question is how to preserve interpretability while improving stability and reproducibility.
 
-\subsection{(5) Uncertainty quantification for high-dimensional and deep survival models}
-Genomic survival models are often used for decision support, where uncertainty matters. Promising directions include:
-\begin{itemize}
-  \item post-selection inference for penalized Cox,
-  \item Bayesian neural survival models with calibrated predictive intervals,
-  \item conformal prediction ideas adapted to censoring (for time-to-event risk sets).
-\end{itemize}
-
-\subsection{(6) Robustness to endpoint noise and label quality}
-Clinical endpoints (especially PFS/DFS) can be inconsistently recorded across institutions. Harmonization efforts like TCGA-CDR help \citep{Liu2018}, but future work could incorporate:
-\begin{itemize}
-  \item measurement-error models for event times,
-  \item sensitivity analyses for endpoint definition variation,
-  \item semi-supervised approaches that exploit unlabeled/weakly labeled survival data.
-\end{itemize}
 
 \section{Conclusion}
-Survival analysis in genomics sits at the intersection of classical time-to-event modeling and modern high-dimensional learning. Core formulations---Cox partial likelihood, penalized objectives, and censoring-aware metrics---underpin much of the literature, while RSF and deep survival models expand expressivity for multi-omics integration. Future progress will likely depend on cross-cohort generalization, richer event-process modeling (competing risks/multi-state), principled uncertainty quantification, and better integration of biological structure.
+Survival analysis in genomics sits at the intersection of classical time-to-event modeling and modern high-dimensional learning. Core formulations, including but not limited to Cox partial likelihood, penalized objectives, and censoring-aware metrics, underpin much of the literature, while RSF and deep survival models expand expressivity for multi-omics integration. Future progress will likely depend on cross-cohort generalization, richer event-process modeling (competing risks/multi-state), principled uncertainty quantification, and better integration of biological structure.
+
+\newpage
+
+\begin{table}[h!]
+\centering
+\caption{Evidence snapshots from representative studies used in this review.}
+\label{tab:evidence_snapshots}
+{\footnotesize
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{
+>{\raggedright\arraybackslash}p{1.8cm}
+>{\raggedright\arraybackslash}p{2.3cm}
+>{\raggedright\arraybackslash}p{2.4cm}
+>{\raggedright\arraybackslash}p{2.2cm}
+>{\raggedright\arraybackslash}X
+}
+\toprule
+Study & Data context & Endpoint context & Model class & Key quantitative takeaway \\
+\midrule
+Ishwaran 2008 & Simulations + coronary artery bypass grafting cohort & Right-censored survival & Random survival forests & OOB prediction error closely tracked test error across settings; demonstrated robust survival-forest workflow for censored outcomes \citep{Ishwaran2008}. \\
+\addlinespace[0.25em]
+Katzman 2018 & METABRIC, SUPPORT, Rotterdam/GBSG & Overall survival/time-to-event benchmarks & Deep Cox neural network & C-index: METABRIC 0.654 (DeepSurv) vs 0.632 (Cox) vs 0.620 (RSF); transfer Rotterdam\(\rightarrow\)GBSG 0.676 vs 0.659 vs 0.648 \citep{Katzman2018}. \\
+\addlinespace[0.25em]
+Binder 2009 & High-dimensional microarray + clinical covariates & Competing risks CIF prediction & Boosted Fine--Gray PSH & Adapted ``bootstrap $.632+$ prediction-error curves'' for competing-risks validation in high-dimensional settings \citep{Binder2009}. \\
+\addlinespace[0.25em]
+McGough 2021 & Stage IV NSCLC clinicogenomic cohort (\(n=4429\)) & Left-truncated, right-censored survival & Penalized Cox (LTRC-aware) & 21.5\% had delayed entry \(>1\) year; diagnosis year and truncation time had \(\rho=-0.63\), motivating explicit delayed-entry adjustment \citep{McGough2021}. \\
+\addlinespace[0.25em]
+Brown 2022 & Clinicogenomic NSCLC/CRC cohorts & Overall survival with delayed profiling entry & Bias assessment under delayed entry & Ignoring delayed entry overestimated median OS by \(>1\) year in stage IV NSCLC/CRC examples \citep{Brown2022}. \\
+\addlinespace[0.25em]
+Liu 2018 & TCGA-CDR (33 cancers, 11{,}160 patients) & Harmonized OS/PFI/DFI/DSS endpoints & Data harmonization for survival analytics & Large-scale endpoint harmonization reduced ambiguity in pan-cancer prognostic analyses and enabled more consistent cross-cancer benchmarking \citep{Liu2018}. \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+
 
 \bibliographystyle{plainnat}
 \bibliography{references}
